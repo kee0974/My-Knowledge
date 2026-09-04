@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>単語帳</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+:root{
+  --paper: #EDE8DA;
+  --card: #FAF7ED;
+  --ink: #2B2620;
+  --ink-soft: #8A8172;
+  --rule: #CBBFA0;
+  --tab1: #2C3E63; /* 紺 */
+  --tab2: #B33A3A; /* 朱 */
+  --tab3: #3F5D4F; /* 深緑 */
+  --tab4: #A67C3D; /* 黄土 */
+  --tab5: #6B4C6B; /* 紫 */
+  --tab6: #3F6B6B; /* 青緑 */
+}
+
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Noto Sans JP', sans-serif;
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+}
+#app{
+  width:100%;
+  max-width:480px;
+  min-height:100vh;
+  padding:20px 16px 100px;
+  position:relative;
+}
+
+.eyebrow{
+  font-family:'Zen Old Mincho', serif;
+  font-size:13px;
+  color:var(--ink-soft);
+  letter-spacing:0.08em;
+  margin:0 0 2px;
+}
+h1.title{
+  font-family:'Zen Old Mincho', serif;
+  font-weight:700;
+  font-size:26px;
+  margin:0 0 18px;
+  line-height:1.3;
+}
+
+/* ---- search ---- */
+.searchbar{
+  display:flex;
+  align-items:center;
+  background:var(--card);
+  border:1px solid var(--rule);
+  padding:9px 12px;
+  margin-bottom:16px;
+}
+.searchbar input{
+  border:none;
+  background:none;
+  outline:none;
+  font-family:'Noto Sans JP', sans-serif;
+  font-size:14px;
+  color:var(--ink);
+  width:100%;
+}
+.searchbar input::placeholder{color:var(--ink-soft);}
+.searchbar svg{flex-shrink:0; margin-right:8px;}
+
+/* ---- deck list ---- */
+.deck-row{
+  display:flex;
+  background:var(--card);
+  border:1px solid var(--rule);
+  border-top:none;
+  cursor:pointer;
+  user-select:none;
+}
+.deck-row:first-of-type{border-top:1px solid var(--rule);}
+.deck-tab{
+  width:10px;
+  flex-shrink:0;
+}
+.deck-body{
+  flex:1;
+  padding:14px 14px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  min-width:0;
+}
+.deck-name{
+  font-family:'Zen Old Mincho', serif;
+  font-size:16px;
+  font-weight:500;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.deck-meta{
+  font-size:12px;
+  color:var(--ink-soft);
+  flex-shrink:0;
+  margin-left:10px;
+  white-space:nowrap;
+}
+.empty-state{
+  text-align:center;
+  padding:60px 20px;
+  color:var(--ink-soft);
+  font-size:14px;
+  line-height:1.8;
+}
+
+/* ---- fab ---- */
+.fab{
+  position:fixed;
+  bottom:24px;
+  left:50%;
+  transform:translateX(-50%);
+  width:100%;
+  max-width:480px;
+  padding:0 16px;
+  display:flex;
+  justify-content:center;
+  pointer-events:none;
+}
+.fab button{
+  pointer-events:auto;
+  font-family:'Noto Sans JP', sans-serif;
+  font-weight:700;
+  font-size:14px;
+  background:var(--ink);
+  color:var(--paper);
+  border:none;
+  padding:13px 26px;
+  cursor:pointer;
+  letter-spacing:0.04em;
+  box-shadow:0 4px 14px rgba(0,0,0,0.25);
+}
+.fab button:active{transform:scale(0.97);}
+
+/* ---- deck detail ---- */
+.backbtn{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  background:none;
+  border:none;
+  color:var(--ink-soft);
+  font-family:'Noto Sans JP', sans-serif;
+  font-size:13px;
+  cursor:pointer;
+  padding:0;
+  margin-bottom:10px;
+}
+.deck-header{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:4px;
+}
+.dot{width:12px;height:12px;flex-shrink:0;}
+.studybtn{
+  width:100%;
+  background:var(--ink);
+  color:var(--paper);
+  border:none;
+  font-family:'Noto Sans JP', sans-serif;
+  font-weight:700;
+  font-size:15px;
+  padding:15px;
+  margin:16px 0 22px;
+  cursor:pointer;
+  letter-spacing:0.03em;
+}
+.studybtn:disabled{opacity:0.35; cursor:default;}
+.studybtn:active:not(:disabled){transform:scale(0.99);}
+
+.card-item{
+  background:var(--card);
+  border:1px solid var(--rule);
+  border-top:none;
+  padding:12px 14px;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.card-item:first-of-type{border-top:1px solid var(--rule);}
+.card-front{
+  font-size:14px;
+  line-height:1.6;
+  flex:1;
+  min-width:0;
+  word-break:break-word;
+}
+.card-actions{display:flex; gap:6px; flex-shrink:0;}
+.icon-btn{
+  background:none;
+  border:1px solid var(--rule);
+  width:28px;
+  height:28px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  color:var(--ink-soft);
+  flex-shrink:0;
+}
+.icon-btn:active{background:var(--rule);}
+.section-label{
+  font-size:11px;
+  color:var(--ink-soft);
+  letter-spacing:0.08em;
+  margin:24px 0 0;
+}
+
+/* ---- modal ---- */
+.overlay{
+  position:fixed; inset:0;
+  background:rgba(43,38,32,0.55);
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  z-index:50;
+}
+.sheet{
+  background:var(--paper);
+  width:100%;
+  max-width:480px;
+  padding:22px 18px 26px;
+  border-top:2px solid var(--ink);
+  animation:slideup 0.22s ease-out;
+}
+@keyframes slideup{from{transform:translateY(20px); opacity:0;} to{transform:translateY(0); opacity:1;}}
+.sheet h3{
+  font-family:'Zen Old Mincho', serif;
+  font-size:17px;
+  margin:0 0 16px;
+}
+.field-label{
+  font-size:12px;
+  color:var(--ink-soft);
+  margin-bottom:5px;
+  display:block;
+}
+.field{
+  width:100%;
+  background:var(--card);
+  border:1px solid var(--rule);
+  padding:10px 12px;
+  font-family:'Noto Sans JP', sans-serif;
+  font-size:14px;
+  color:var(--ink);
+  margin-bottom:14px;
+  resize:vertical;
+  outline:none;
+}
+.field:focus{border-color:var(--ink);}
+.color-picker{display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;}
+.swatch{
+  width:30px;height:30px;
+  cursor:pointer;
+  border:2px solid transparent;
+}
+.swatch.selected{border-color:var(--ink);}
+.sheet-actions{display:flex; gap:10px;}
+.btn-primary,.btn-secondary,.btn-danger{
+  flex:1;
+  padding:12px;
+  border:none;
+  font-family:'Noto Sans JP', sans-serif;
+  font-weight:700;
+  font-size:14px;
+  cursor:pointer;
+}
+.btn-primary{background:var(--ink); color:var(--paper);}
+.btn-secondary{background:none; border:1px solid var(--rule); color:var(--ink);}
+.btn-danger{background:var(--tab2); color:#fff;}
+
+/* ---- study mode ---- */
+.study-wrap{
+  display:flex;
+  flex-direction:column;
+  min-height:calc(100vh - 40px);
+}
+.study-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:6px;
+}
+.progress-track{
+  height:3px;
+  background:var(--rule);
+  margin-bottom:30px;
+}
+.progress-fill{height:100%; background:var(--ink); transition:width 0.3s;}
+.flashcard-area{
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  perspective:1200px;
+  margin-bottom:24px;
+}
+.flashcard{
+  width:100%;
+  max-width:340px;
+  height:340px;
+  position:relative;
+  cursor:pointer;
+  transform-style:preserve-3d;
+  transition:transform 0.5s cubic-bezier(.4,.2,.2,1);
+}
+.flashcard.flipped{transform:rotateY(180deg);}
+.face{
+  position:absolute; inset:0;
+  backface-visibility:hidden;
+  background:var(--card);
+  border:1px solid var(--rule);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:28px;
+  text-align:center;
+}
+.face-front{font-family:'Zen Old Mincho', serif; font-size:20px; line-height:1.6; font-weight:500;}
+.face-back{
+  transform:rotateY(180deg);
+  background:var(--ink);
+  color:var(--paper);
+  font-size:15px;
+  line-height:1.8;
+  font-family:'Noto Sans JP', sans-serif;
+}
+.tap-hint{
+  text-align:center;
+  font-size:11px;
+  color:var(--ink-soft);
+  margin-bottom:18px;
+}
+.study-actions{display:flex; gap:10px;}
+.study-actions button{
+  flex:1;
+  padding:15px;
+  border:none;
+  font-family:'Noto Sans JP', sans-serif;
+  font-weight:700;
+  font-size:14px;
+  cursor:pointer;
+}
+.btn-again{background:var(--card); border:1px solid var(--rule); color:var(--ink);}
+.btn-know{background:var(--tab3); color:#fff;}
+.study-actions button:disabled{opacity:0.3;}
+.done-screen{
+  text-align:center;
+  padding:80px 20px;
+}
+.done-screen p.big{font-family:'Zen Old Mincho', serif; font-size:22px; margin-bottom:8px;}
+.done-screen p.small{color:var(--ink-soft); font-size:13px; margin-bottom:28px;}
+</style>
+</head>
+<body>
+<div id="app"><div style="padding:60px 20px; text-align:center; color:#8A8172; font-size:13px;">読み込み中…</div></div>
+
+<script>
+const STORAGE_KEY = 'flashcards-app-data';
+const TAB_COLORS = ['tab1','tab2','tab3','tab4','tab5','tab6'];
+
+let state = { decks: [] };
+let view = { screen: 'home' };
+let searchQuery = '';
+let modal = null; // {type, ...}
+
+const app = document.getElementById('app');
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+async function loadData(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, false);
+    if(res && res.value){ state = JSON.parse(res.value); }
+  }catch(e){
+    state = { decks: [] };
+  }
+  render();
+}
+
+let saveTimer = null;
+function saveData(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{ await window.storage.set(STORAGE_KEY, JSON.stringify(state), false); }
+    catch(e){ console.error('save failed', e); }
+  }, 150);
+}
+
+function esc(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function getDeck(id){ return state.decks.find(d=>d.id===id); }
+
+/* ================= RENDER ROUTER ================= */
+function render(){
+  if(view.screen === 'home') return renderHome();
+  if(view.screen === 'deck') return renderDeckDetail();
+  if(view.screen === 'study') return renderStudy();
+}
+
+/* ================= HOME ================= */
+function renderHome(){
+  const decks = state.decks.filter(d => d.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  let html = `
+    <p class="eyebrow">わたしの単語帳</p>
+    <h1 class="title">カード目録</h1>
+    <div class="searchbar">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8A8172" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="searchInput" placeholder="デッキを検索" value="${esc(searchQuery)}">
+    </div>
+  `;
+  if(state.decks.length === 0){
+    html += `<div class="empty-state">まだデッキがありません。<br>右下のボタンから最初のデッキを作りましょう。</div>`;
+  } else if(decks.length === 0){
+    html += `<div class="empty-state">「${esc(searchQuery)}」に一致するデッキはありません。</div>`;
+  } else {
+    html += decks.map(d => `
+      <div class="deck-row" data-deck="${d.id}">
+        <div class="deck-tab" style="background:var(--${d.color})"></div>
+        <div class="deck-body">
+          <div class="deck-name">${esc(d.name)}</div>
+          <div class="deck-meta">${d.cards.length}枚</div>
+        </div>
+      </div>
+    `).join('');
+  }
+  html += `<div class="fab"><button id="newDeckBtn">＋ 新しいデッキ</button></div>`;
+  app.innerHTML = html;
+
+  document.getElementById('searchInput').oninput = (e)=>{ searchQuery = e.target.value; renderHome(); };
+  document.getElementById('searchInput').focus();
+  document.getElementById('newDeckBtn').onclick = ()=> openDeckModal(null);
+  document.querySelectorAll('.deck-row').forEach(el=>{
+    el.onclick = ()=>{ view = {screen:'deck', deckId: el.dataset.deck}; render(); };
+  });
+}
+
+/* ================= DECK MODAL (create/edit) ================= */
+function openDeckModal(deckId){
+  const deck = deckId ? getDeck(deckId) : null;
+  modal = { type:'deck', deckId, name: deck ? deck.name : '', color: deck ? deck.color : TAB_COLORS[0] };
+  renderModal();
+}
+function renderModal(){
+  if(!modal) return;
+  let html = '';
+  if(modal.type === 'deck'){
+    html = `
+      <div class="overlay" id="overlay">
+        <div class="sheet">
+          <h3>${modal.deckId ? 'デッキを編集' : '新しいデッキ'}</h3>
+          <label class="field-label">デッキ名</label>
+          <input class="field" id="deckNameInput" placeholder="例: 若者言葉" value="${esc(modal.name)}">
+          <label class="field-label">タブの色</label>
+          <div class="color-picker">
+            ${TAB_COLORS.map(c=>`<div class="swatch ${c===modal.color?'selected':''}" data-color="${c}" style="background:var(--${c})"></div>`).join('')}
+          </div>
+          <div class="sheet-actions">
+            <button class="btn-secondary" id="cancelBtn">キャンセル</button>
+            ${modal.deckId ? `<button class="btn-danger" id="deleteDeckBtn">削除</button>` : ''}
+            <button class="btn-primary" id="saveDeckBtn">保存</button>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if(modal.type === 'card'){
+    html = `
+      <div class="overlay" id="overlay">
+        <div class="sheet">
+          <h3>${modal.cardId ? 'カードを編集' : 'カードを追加'}</h3>
+          <label class="field-label">表（問題）</label>
+          <textarea class="field" id="cardFrontInput" rows="2" placeholder="例: 「しゃばい」の意味は？">${esc(modal.front)}</textarea>
+          <label class="field-label">裏（答え）</label>
+          <textarea class="field" id="cardBackInput" rows="3" placeholder="例: ダサい、格好悪いという意味の若者言葉">${esc(modal.back)}</textarea>
+          <div class="sheet-actions">
+            <button class="btn-secondary" id="cancelBtn">キャンセル</button>
+            ${modal.cardId ? `<button class="btn-danger" id="deleteCardBtn">削除</button>` : ''}
+            <button class="btn-primary" id="saveCardBtn">保存</button>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if(modal.type === 'confirmDeleteDeck'){
+    html = `
+      <div class="overlay" id="overlay">
+        <div class="sheet">
+          <h3>「${esc(modal.name)}」を削除しますか？</h3>
+          <p style="font-size:13px; color:var(--ink-soft); margin-bottom:20px;">中のカードもすべて削除されます。この操作は取り消せません。</p>
+          <div class="sheet-actions">
+            <button class="btn-secondary" id="cancelBtn">キャンセル</button>
+            <button class="btn-danger" id="confirmDeleteBtn">削除する</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap.firstElementChild);
+  wireModal();
+}
+function closeModal(){
+  const ov = document.getElementById('overlay');
+  if(ov) ov.remove();
+  modal = null;
+}
+function wireModal(){
+  const cancelBtn = document.getElementById('cancelBtn');
+  if(cancelBtn) cancelBtn.onclick = closeModal;
+
+  if(modal.type === 'deck'){
+    document.querySelectorAll('.swatch').forEach(s=>{
+      s.onclick = ()=>{ modal.color = s.dataset.color; document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('selected')); s.classList.add('selected'); };
+    });
+    document.getElementById('saveDeckBtn').onclick = ()=>{
+      const name = document.getElementById('deckNameInput').value.trim();
+      if(!name) return;
+      if(modal.deckId){
+        const d = getDeck(modal.deckId);
+        d.name = name; d.color = modal.color;
+      } else {
+        state.decks.push({ id: uid(), name, color: modal.color, cards: [] });
+      }
+      saveData();
+      closeModal();
+      render();
+    };
+    const deleteDeckBtn = document.getElementById('deleteDeckBtn');
+    if(deleteDeckBtn) deleteDeckBtn.onclick = ()=>{
+      const d = getDeck(modal.deckId);
+      const deckId = modal.deckId;
+      closeModal();
+      modal = { type:'confirmDeleteDeck', deckId, name: d.name };
+      renderModal();
+    };
+  }
+
+  if(modal.type === 'card'){
+    document.getElementById('saveCardBtn').onclick = ()=>{
+      const front = document.getElementById('cardFrontInput').value.trim();
+      const back = document.getElementById('cardBackInput').value.trim();
+      if(!front || !back) return;
+      const deck = getDeck(modal.deckId);
+      if(modal.cardId){
+        const c = deck.cards.find(c=>c.id===modal.cardId);
+        c.front = front; c.back = back;
+      } else {
+        deck.cards.push({ id: uid(), front, back });
+      }
+      saveData();
+      closeModal();
+      render();
+    };
+    const deleteCardBtn = document.getElementById('deleteCardBtn');
+    if(deleteCardBtn) deleteCardBtn.onclick = ()=>{
+      const deck = getDeck(modal.deckId);
+      deck.cards = deck.cards.filter(c=>c.id !== modal.cardId);
+      saveData();
+      closeModal();
+      render();
+    };
+  }
+
+  if(modal.type === 'confirmDeleteDeck'){
+    document.getElementById('confirmDeleteBtn').onclick = ()=>{
+      state.decks = state.decks.filter(d=>d.id !== modal.deckId);
+      saveData();
+      closeModal();
+      view = { screen:'home' };
+      render();
+    };
+  }
+}
+
+/* ================= DECK DETAIL ================= */
+let deckSearchQuery = '';
+function renderDeckDetail(){
+  const deck = getDeck(view.deckId);
+  if(!deck){ view = {screen:'home'}; return render(); }
+  const cards = deck.cards.filter(c => c.front.toLowerCase().includes(deckSearchQuery.toLowerCase()));
+
+  let html = `
+    <button class="backbtn" id="backBtn">← 目録に戻る</button>
+    <div class="deck-header">
+      <div class="dot" style="background:var(--${deck.color})"></div>
+      <h1 class="title" style="margin:0;">${esc(deck.name)}</h1>
+    </div>
+    <div class="deck-meta" style="margin-bottom:6px;">${deck.cards.length}枚のカード</div>
+    <button class="icon-btn" id="editDeckBtn" style="width:auto; padding:4px 10px; font-size:12px; margin-bottom:14px;">デッキ名・色を編集</button>
+    <button class="studybtn" id="studyBtn" ${deck.cards.length===0?'disabled':''}>学習を始める</button>
+    <div class="searchbar">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8A8172" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="cardSearchInput" placeholder="カードを検索" value="${esc(deckSearchQuery)}">
+    </div>
+  `;
+  if(deck.cards.length === 0){
+    html += `<div class="empty-state">カードがまだありません。<br>右下のボタンから追加しましょう。</div>`;
+  } else if(cards.length === 0){
+    html += `<div class="empty-state">一致するカードがありません。</div>`;
+  } else {
+    html += cards.map(c => `
+      <div class="card-item" data-card="${c.id}">
+        <div class="card-front">${esc(c.front)}</div>
+        <div class="card-actions">
+          <button class="icon-btn" data-edit="${c.id}">✎</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  html += `<div class="fab"><button id="addCardBtn">＋ カードを追加</button></div>`;
+  app.innerHTML = html;
+
+  document.getElementById('backBtn').onclick = ()=>{ view = {screen:'home'}; deckSearchQuery=''; render(); };
+  document.getElementById('editDeckBtn').onclick = ()=> openDeckModal(deck.id);
+  document.getElementById('studyBtn').onclick = ()=>{
+    if(deck.cards.length===0) return;
+    view = { screen:'study', deckId: deck.id, order: shuffle(deck.cards.map(c=>c.id)), index:0, knownCount:0 };
+    render();
+  };
+  document.getElementById('cardSearchInput').oninput = (e)=>{ deckSearchQuery = e.target.value; renderDeckDetail(); };
+  document.getElementById('addCardBtn').onclick = ()=>{ modal = {type:'card', deckId: deck.id, cardId:null, front:'', back:''}; renderModal(); };
+  document.querySelectorAll('[data-edit]').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      const c = deck.cards.find(c=>c.id===btn.dataset.edit);
+      modal = {type:'card', deckId: deck.id, cardId:c.id, front:c.front, back:c.back};
+      renderModal();
+    };
+  });
+}
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+/* ================= STUDY MODE ================= */
+let isFlipped = false;
+function renderStudy(){
+  const deck = getDeck(view.deckId);
+  if(!deck){ view = {screen:'home'}; return render(); }
+
+  if(view.index >= view.order.length){
+    app.innerHTML = `
+      <div class="study-wrap">
+        <button class="backbtn" id="exitBtn">← ${esc(deck.name)}に戻る</button>
+        <div class="done-screen">
+          <p class="big">おつかれさまでした</p>
+          <p class="small">${view.order.length}枚中 ${view.knownCount}枚 覚えました</p>
+          <button class="btn-primary" id="restartBtn" style="padding:13px 30px;">もう一度</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('exitBtn').onclick = ()=>{ view = {screen:'deck', deckId: deck.id}; render(); };
+    document.getElementById('restartBtn').onclick = ()=>{
+      view = { screen:'study', deckId: deck.id, order: shuffle(deck.cards.map(c=>c.id)), index:0, knownCount:0 };
+      render();
+    };
+    return;
+  }
+
+  isFlipped = false;
+  const cardId = view.order[view.index];
+  const card = deck.cards.find(c=>c.id===cardId);
+  const pct = Math.round((view.index / view.order.length) * 100);
+
+  app.innerHTML = `
+    <div class="study-wrap">
+      <div class="study-top">
+        <button class="backbtn" id="exitBtn" style="margin:0;">← 中断</button>
+        <div class="deck-meta">${view.index+1} / ${view.order.length}</div>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="flashcard-area">
+        <div class="flashcard" id="flashcard">
+          <div class="face face-front">${esc(card.front)}</div>
+          <div class="face face-back">${esc(card.back)}</div>
+        </div>
+      </div>
+      <div class="tap-hint">カードをタップして答えを見る</div>
+      <div class="study-actions">
+        <button class="btn-again" id="againBtn" disabled>もう一度</button>
+        <button class="btn-know" id="knowBtn" disabled>覚えた</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('exitBtn').onclick = ()=>{ view = {screen:'deck', deckId: deck.id}; render(); };
+  const fc = document.getElementById('flashcard');
+  fc.onclick = ()=>{
+    isFlipped = !isFlipped;
+    fc.classList.toggle('flipped', isFlipped);
+    document.getElementById('againBtn').disabled = !isFlipped;
+    document.getElementById('knowBtn').disabled = !isFlipped;
+  };
+  document.getElementById('againBtn').onclick = ()=>{
+    view.index++;
+    render();
+  };
+  document.getElementById('knowBtn').onclick = ()=>{
+    view.index++;
+    view.knownCount++;
+    render();
+  };
+}
+
+loadData();
+</script>
+</body>
+</html>
