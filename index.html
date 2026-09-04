@@ -368,6 +368,48 @@ h1.title{
 }
 .done-screen p.big{font-family:'Zen Old Mincho', serif; font-size:22px; margin-bottom:8px;}
 .done-screen p.small{color:var(--ink-soft); font-size:13px; margin-bottom:28px;}
+
+/* ---- toolbar (import/export) ---- */
+.toolbar{
+  display:flex;
+  gap:8px;
+  margin-bottom:16px;
+}
+.toolbar button{
+  flex:1;
+  background:var(--card);
+  border:1px solid var(--rule);
+  color:var(--ink-soft);
+  font-family:'Noto Sans JP', sans-serif;
+  font-size:12px;
+  padding:9px 6px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+}
+.toolbar button:active{background:var(--rule);}
+
+/* ---- toast ---- */
+.toast{
+  position:fixed;
+  left:50%;
+  bottom:90px;
+  transform:translateX(-50%) translateY(20px);
+  background:var(--ink);
+  color:var(--paper);
+  font-size:13px;
+  padding:11px 20px;
+  max-width:88%;
+  text-align:center;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.25s, transform 0.25s;
+  z-index:100;
+  line-height:1.5;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 </style>
 </head>
 <body>
@@ -386,23 +428,39 @@ const app = document.getElementById('app');
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
-async function loadData(){
+function loadData(){
   try{
-    const res = await window.storage.get(STORAGE_KEY, false);
-    if(res && res.value){ state = JSON.parse(res.value); }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){ state = JSON.parse(raw); }
   }catch(e){
+    console.error('load failed', e);
     state = { decks: [] };
   }
   render();
 }
 
-let saveTimer = null;
 function saveData(){
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(async ()=>{
-    try{ await window.storage.set(STORAGE_KEY, JSON.stringify(state), false); }
-    catch(e){ console.error('save failed', e); }
-  }, 150);
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){
+    console.error('save failed', e);
+    showToast('保存に失敗しました（ブラウザのストレージが使えない可能性があります）');
+  }
+}
+
+let toastTimer = null;
+function showToast(msg){
+  clearTimeout(toastTimer);
+  let t = document.getElementById('toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.className = 'toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add('show');
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 2400);
 }
 
 function esc(s){
@@ -424,6 +482,11 @@ function renderHome(){
   let html = `
     <p class="eyebrow">わたしの単語帳</p>
     <h1 class="title">カード目録</h1>
+    <div class="toolbar">
+      <button id="exportBtn">↓ 書き出し</button>
+      <button id="importBtn">↑ ファイルから読み込み</button>
+      <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
+    </div>
     <div class="searchbar">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8A8172" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input id="searchInput" placeholder="デッキを検索" value="${esc(searchQuery)}">
@@ -453,6 +516,78 @@ function renderHome(){
   document.querySelectorAll('.deck-row').forEach(el=>{
     el.onclick = ()=>{ view = {screen:'deck', deckId: el.dataset.deck}; render(); };
   });
+
+  document.getElementById('exportBtn').onclick = exportData;
+  const fileInput = document.getElementById('importFileInput');
+  document.getElementById('importBtn').onclick = ()=> fileInput.click();
+  fileInput.onchange = (e)=>{
+    const file = e.target.files[0];
+    if(file) importFromFile(file);
+    fileInput.value = '';
+  };
+}
+
+/* ---- export: download current state as a JSON file ---- */
+function exportData(){
+  try{
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `カード目録_${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('書き出しました');
+  }catch(e){
+    console.error(e);
+    showToast('書き出しに失敗しました');
+  }
+}
+
+/* ---- import: read a JSON file and merge its decks into current state ---- */
+function importFromFile(file){
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let data;
+    try{
+      data = JSON.parse(reader.result);
+    }catch(e){
+      showToast('ファイルを読み込めませんでした（JSON形式ではありません）');
+      return;
+    }
+    const incomingDecks = Array.isArray(data.decks) ? data.decks : (Array.isArray(data) ? data : null);
+    if(!incomingDecks){
+      showToast('このファイルの形式を認識できませんでした');
+      return;
+    }
+    let addedDecks = 0, addedCards = 0;
+    incomingDecks.forEach(d=>{
+      if(!d || typeof d.name !== 'string') return;
+      const cards = Array.isArray(d.cards) ? d.cards
+        .filter(c => c && typeof c.front === 'string' && typeof c.back === 'string')
+        .map(c => ({ id: uid(), front: c.front, back: c.back })) : [];
+      state.decks.push({
+        id: uid(),
+        name: d.name,
+        color: TAB_COLORS.includes(d.color) ? d.color : TAB_COLORS[state.decks.length % TAB_COLORS.length],
+        cards
+      });
+      addedDecks++;
+      addedCards += cards.length;
+    });
+    if(addedDecks === 0){
+      showToast('読み込めるデッキが見つかりませんでした');
+      return;
+    }
+    saveData();
+    render();
+    showToast(`${addedDecks}個のデッキ（カード${addedCards}枚）を読み込みました`);
+  };
+  reader.onerror = ()=> showToast('ファイルの読み込みに失敗しました');
+  reader.readAsText(file);
 }
 
 /* ================= DECK MODAL (create/edit) ================= */
